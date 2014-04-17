@@ -43,3 +43,7 @@ the LEDs will always be at least `MINIMUM_LUX` bright.
 `DEFAULT_BRIGHTNESS` sets the brightness for NeoPixels if there is no TSL2561, or the TSL2561 can't be read.  
 (Failure to read the TSL2561 often results from either total darkness or complete saturation, situations 
 which are unfortunately indistinguishable; I chose to handle this by setting `DEFAULT_BRIGHTNESS` relatively high.)
+
+`MAXIMUM_DRIFT` controls the maximum change in a red, green, or blue (independently) per change cycle.  Valid values are 0 (never change the color) to 255 (allow any amount of change).
+
+`TWEEN_CONSTANT` controls the speed of the change between randomly-chosen colors.  Set this number high to get slow changes with many intermediate gradations; set it low to get quick transitions with few frames between them.

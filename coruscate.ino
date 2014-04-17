@@ -8,6 +8,9 @@
 #define ONBOARD_ERROR_LED 13
 #define MINIMUM_LUX 20
 #define DEFAULT_BRIGHTNESS 255
+#define NUMBER_OF_LEDS 16
+#define MAXIMUM_DRIFT 50
+#define TWEEN_CONSTANT 10
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
@@ -16,7 +19,7 @@
 //   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBER_OF_LEDs, PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_TSL2561 tsl = Adafruit_TSL2561(TSL2561_ADDR_FLOAT, 12345);
 int lux = DEFAULT_BRIGHTNESS;
 
@@ -61,7 +64,7 @@ void setup() {
 }
 
 void loop() {
-	random_walk(50, 10);
+	random_walk(MAXIMUM_DRIFT, TWEEN_CONSTANT);
 }
 
 uint8_t permute_color(uint8_t start_color, uint8_t max_change) {
@@ -96,10 +99,7 @@ uint8_t calculate_tween(uint8_t start_color, uint8_t end_color, uint8_t this_ste
 		change = (uint8_t) (start_color - difference*tweenfactor);
 	} 
 
-	//Serial.print("Saying we should do "); Serial.print(change); Serial.print(" to get the tween between "); Serial.print (start_color); Serial.print(" and "); Serial.print(end_color); Serial.print(" for step "); Serial.print(this_step); Serial.print(" of "); Serial.println(tween_constant);	
-
 	return change;
-		
 }
 void random_walk(uint8_t max_change, uint8_t tween) {
 	uint16_t i, j;
@@ -112,16 +112,15 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 	uint8_t lastblue[strip.numPixels()];
 
 	//set colors separately from brightness
-	//for every color cycle, do 20 brightness reads
 	for(j=0; ; j++) {
 		if ((j % 5) == 0) {
 			tsl.getEvent(&event);
 			if(event.light) {
 				lux = (int) ((double) (event.light) *(.15));
-				//Serial.print("Raw light reading: "); Serial.println(event.light);
+				Serial.print("Raw light reading: "); Serial.println(event.light);
 				if(lux < MINIMUM_LUX) lux = MINIMUM_LUX;
 				if(lux > 255) lux = 255;
-	      			//Serial.print("Read lux as "); Serial.println(lux);
+	      			Serial.print("Read lux as "); Serial.println(lux);
 	    		} else {
 				//sensor is likely saturated; crank it
 				lux = DEFAULT_BRIGHTNESS;
@@ -133,12 +132,12 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 			//choose a new color for each pixel
 			for(i=0; i<strip.numPixels(); i++) { 
 				if(j == 0 && lastred[i] == 0 && lastgreen[i] == 0 && lastblue[i] == 0) {
-					//Serial.print("Randomizing initial value for pixel "); Serial.println(i);
+					Serial.print("Randomizing initial value for pixel "); Serial.println(i);
 					lastred[i] = random(0, 255);
 					lastgreen[i] = random(0, 255);
 					lastblue[i] = random(0, 255);
 				} else {
-					//Serial.print("Shifting old value into previous array for pixel "); Serial.println(i);
+					Serial.print("Shifting old value into previous array for pixel "); Serial.println(i);
 					lastred[i] = nextred[i];
 					lastgreen[i] = nextgreen[i];
 					lastblue[i] = nextblue[i];
@@ -154,25 +153,18 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 			uint8_t greentween;
 			uint8_t bluetween;
 
-			//Serial.print("Going from "); Serial.print(lastred[i]); Serial.print(", ");
-			//Serial.print(lastgreen[i]); Serial.print(", ");
-			//Serial.print(lastblue[i]); Serial.print(", ");
-			//Serial.print("to "); Serial.print(nextred[i]); Serial.print(", ");
-			//Serial.print(nextgreen[i]); Serial.print(", ");
-			//Serial.print(nextblue[i]); 
-			//Serial.print(" on pixel number "); Serial.print(i);
-			//Serial.println("");
-
 			//take tween cycles to go between lastred and nextred, etc
 			redtween = calculate_tween(lastred[i], nextred[i], j%tween, tween);
 			greentween = calculate_tween(lastgreen[i], nextgreen[i], j%tween, tween);
 			bluetween = calculate_tween(lastblue[i], nextblue[i], j%tween, tween);
 
-			//Serial.print("Setting color to "); Serial.print(redtween); Serial.print(", ");
-			//Serial.print(greentween); Serial.print(", ");
-			//Serial.print(bluetween); Serial.print(", ");
-			//Serial.print(" on pixel number "); Serial.print(i);
-			//Serial.println("");
+			#ifdef DEBUG_OUTPUT
+			Serial.print("Setting color to "); Serial.print(redtween); Serial.print(", ");
+			Serial.print(greentween); Serial.print(", ");
+			Serial.print(bluetween); Serial.print(", ");
+			Serial.print(" on pixel number "); Serial.print(i);
+			Serial.println("");
+			#endif
 
 			strip.setPixelColor(i, redtween, greentween, bluetween);
 	 	}
