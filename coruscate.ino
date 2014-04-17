@@ -4,7 +4,10 @@
 #include <Adafruit_TSL2561.h>
 
 #define PIN 6
+#define RANDOM_SEED_PIN 10
+#define ONBOARD_ERROR_LED 13
 #define MINIMUM_LUX 20
+#define DEFAULT_BRIGHTNESS 255
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
@@ -15,7 +18,7 @@
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_TSL2561 tsl = Adafruit_TSL2561(TSL2561_ADDR_FLOAT, 12345);
-int lux = 127;
+int lux = DEFAULT_BRIGHTNESS;
 
 void configureSensor(void)
 {
@@ -32,7 +35,7 @@ void configureSensor(void)
 void setup() {
 	//onboard LED, for problem reporting
 	int blinky;
-	blinky = 13;
+	blinky = ONBOARD_ERROR_LED;
 	pinMode(blinky, OUTPUT);
 
 	//pixels
@@ -53,7 +56,7 @@ void setup() {
 	
 	configureSensor();
 	
-	randomSeed(analogRead(10)); //analog read of an unconnected pin gives us good-enough entropy
+	randomSeed(analogRead(RANDOM_ANALOG_PIN)); //analog read of an unconnected pin gives us good-enough entropy
  
 }
 
@@ -121,7 +124,7 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 	      			//Serial.print("Read lux as "); Serial.println(lux);
 	    		} else {
 				//sensor is likely saturated; crank it
-				lux = 255;
+				lux = DEFAULT_BRIGHTNESS;
 			}
 		}
 		strip.setBrightness(lux);
