@@ -1,16 +1,17 @@
-#include <Wire.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561.h>
+#include <Wire.h>
 
 #define PIN 6
 #define RANDOM_SEED_PIN 10
 #define ONBOARD_ERROR_LED 13
-#define MINIMUM_LUX 20
+#define MINIMUM_LUX 50
 #define DEFAULT_BRIGHTNESS 255
+#define MIDDLE_ADDED_INTENSITY 30
 #define NUMBER_OF_LEDS 16
 #define MAXIMUM_DRIFT 50
-#define TWEEN_CONSTANT 10
+#define TWEEN_CONSTANT 30
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
@@ -19,15 +20,15 @@
 //   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBER_OF_LEDs, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMBER_OF_LEDS, PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_TSL2561 tsl = Adafruit_TSL2561(TSL2561_ADDR_FLOAT, 12345);
 int lux = DEFAULT_BRIGHTNESS;
 
 void configureSensor(void)
 {
-	tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
+	//tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
 	//tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
-	//tsl.enableAutoGain(true);          /* Auto-gain ... switches automatically between 1x and 16x */
+	tsl.enableAutoGain(true);          /* Auto-gain ... switches automatically between 1x and 16x */
 	
 	/* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
 	tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
@@ -45,13 +46,13 @@ void setup() {
 	strip.begin();
 	
 	//serial port; useful only for debug output
-	Serial.begin(9600);
+	//Serial.begin(9600);
 	
 	//light sensor
 	if(!tsl.begin()) {
 		// Give a visual indication with the onboard LED (pin 13, initialized above) if there is a probable wiring problem
 		digitalWrite(blinky, HIGH);
-		Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
+		//Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
 		digitalWrite(blinky, LOW); 
 		delay(10);
 		while(1);
@@ -59,7 +60,7 @@ void setup() {
 	
 	configureSensor();
 	
-	randomSeed(analogRead(RANDOM_ANALOG_PIN)); //analog read of an unconnected pin gives us good-enough entropy
+	randomSeed(analogRead(RANDOM_SEED_PIN)); //analog read of an unconnected pin gives us good-enough entropy
  
 }
 
@@ -117,10 +118,10 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 			tsl.getEvent(&event);
 			if(event.light) {
 				lux = (int) ((double) (event.light) *(.15));
-				Serial.print("Raw light reading: "); Serial.println(event.light);
+				//Serial.print("Raw light reading: "); Serial.println(event.light);
 				if(lux < MINIMUM_LUX) lux = MINIMUM_LUX;
 				if(lux > 255) lux = 255;
-	      			Serial.print("Read lux as "); Serial.println(lux);
+	      			//Serial.print("Read lux as "); Serial.println(lux);
 	    		} else {
 				//sensor is likely saturated; crank it
 				lux = DEFAULT_BRIGHTNESS;
@@ -132,12 +133,12 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 			//choose a new color for each pixel
 			for(i=0; i<strip.numPixels(); i++) { 
 				if(j == 0 && lastred[i] == 0 && lastgreen[i] == 0 && lastblue[i] == 0) {
-					Serial.print("Randomizing initial value for pixel "); Serial.println(i);
+					//Serial.print("Randomizing initial value for pixel "); Serial.println(i);
 					lastred[i] = random(0, 255);
 					lastgreen[i] = random(0, 255);
 					lastblue[i] = random(0, 255);
 				} else {
-					Serial.print("Shifting old value into previous array for pixel "); Serial.println(i);
+					//Serial.print("Shifting old value into previous array for pixel "); Serial.println(i);
 					lastred[i] = nextred[i];
 					lastgreen[i] = nextgreen[i];
 					lastblue[i] = nextblue[i];
@@ -146,6 +147,26 @@ void random_walk(uint8_t max_change, uint8_t tween) {
 				nextred[i] = permute_color(lastred[i], max_change);
 				nextgreen[i] = permute_color(lastgreen[i], max_change);
 				nextblue[i] = permute_color(lastblue[i], max_change);
+
+                                /* lights 7, 12 and 16 have power problems.  attempting to keep them illuminated and looking good */
+                                if(i == 7 && lux > 200) nextred[i] = 0;
+                                if(i == 12 && lux > 64) {
+                                  nextblue[i] = 0;
+                                  nextred[i] = 0;
+                                  if(lux > 100) nextgreen[i] = 0;
+                                }
+                                if(i == 16 && lux > 64) {
+                                  nextgreen[i] = 0;
+                                  nextred[i] = 0;
+                                  if(lux > 100) nextblue[i] = 0;
+                                } 
+                                
+                                /* middle lights (3, 6, 7, 10) need more intensity to overcome the fact that they have more batting */
+                                if (i == 3 || i == 6 || /* i == 7 ||*/ i == 10) {
+                                   if(nextred[i] < 200) nextred[i] += MIDDLE_ADDED_INTENSITY;
+                                   if(nextgreen[i] < 200) nextred[i] += MIDDLE_ADDED_INTENSITY;
+                                   if(nextblue[i] < 200) nextred[i] += MIDDLE_ADDED_INTENSITY;
+                                }
 			} 
 		}
 		for(i=0; i < strip.numPixels(); i++) { 
